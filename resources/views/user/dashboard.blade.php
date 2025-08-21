@@ -240,6 +240,131 @@
                 </div>
             </div>
         </div>
+        <!-- Full Width Security Section -->
+        <div class="mb-12">
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-xl p-8 text-white">
+                <div class="flex flex-col lg:flex-row items-center justify-between mb-8">
+                    <div class="text-center lg:text-left mb-4 lg:mb-0">
+                        <h2 class="text-3xl font-bold mb-2">🔒 Account Security Center</h2>
+                        <p class="text-blue-100 text-lg">Protect your KlikBid account with enterprise-level security</p>
+                    </div>
+                    @if(Auth::user()->google2fa_enabled)
+                        <div class="px-6 py-3 bg-green-500 text-white font-bold rounded-full text-lg">
+                            ✅ PROTECTED
+                        </div>
+                    @else
+                        <div class="px-6 py-3 bg-red-500 text-white font-bold rounded-full text-lg animate-pulse">
+                            ⚠️ VULNERABLE
+                        </div>
+                    @endif
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    @if(!Auth::user()->google2fa_enabled)
+                        <!-- Enable 2FA Card -->
+                        <div class="bg-white rounded-xl p-8 text-gray-900">
+                            <div class="text-center mb-6">
+                                <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <span class="text-4xl">🛡️</span>
+                                </div>
+                                <h3 class="text-2xl font-bold text-gray-900 mb-2">Enable Two-Factor Authentication</h3>
+                                <p class="text-gray-600 text-lg leading-relaxed">
+                                    Add an extra layer of security to your auction account. Protect your bids, winnings, and personal information.
+                                </p>
+                            </div>
+
+                            <div class="space-y-4 mb-6">
+                                <div class="flex items-center space-x-3 text-gray-700">
+                                    <span class="text-green-500 text-xl">✓</span>
+                                    <span>Prevent unauthorized access</span>
+                                </div>
+                                <div class="flex items-center space-x-3 text-gray-700">
+                                    <span class="text-green-500 text-xl">✓</span>
+                                    <span>Secure your auction winnings</span>
+                                </div>
+                                <div class="flex items-center space-x-3 text-gray-700">
+                                    <span class="text-green-500 text-xl">✓</span>
+                                    <span>ISO 27001 security compliant</span>
+                                </div>
+                            </div>
+
+                            <a href="{{ route('2fa.setup') }}"
+                               class="block w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xl font-bold py-4 px-6 rounded-xl hover:from-blue-700 hover:to-purple-700 text-center transition duration-200 transform hover:scale-105">
+                                🔧 Setup 2FA Now - FREE
+                            </a>
+                        </div>
+                    @else
+                        <!-- 2FA Enabled Card -->
+                        <div class="bg-white rounded-xl p-8 text-gray-900">
+                            <div class="text-center mb-6">
+                                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <span class="text-4xl">✅</span>
+                                </div>
+                                <h3 class="text-2xl font-bold text-green-800 mb-2">2FA Protection Active</h3>
+                                <p class="text-gray-600 text-lg">
+                                    Enabled on {{ Auth::user()->google2fa_enabled_at->format('M j, Y') }}
+                                </p>
+                            </div>
+
+                            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                                <p class="font-medium text-gray-700 mb-4">To disable 2FA, enter your authentication code:</p>
+                                <form method="POST" action="{{ route('2fa.disable') }}" class="space-y-4">
+                                    @csrf
+                                    <input type="text"
+                                           name="one_time_password"
+                                           placeholder="Enter 6-digit code"
+                                           class="w-full border border-gray-300 rounded-lg px-4 py-3 text-lg text-center tracking-widest"
+                                           maxlength="6"
+                                           required>
+                                    <button type="submit"
+                                            class="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700"
+                                            onclick="return confirm('Are you sure? This will make your account less secure.')">
+                                        Disable 2FA
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- Security Tips Card -->
+                    <div class="bg-white bg-opacity-10 backdrop-blur rounded-xl p-8">
+                        <h3 class="text-2xl font-bold text-white mb-6 flex items-center">
+                            <span class="mr-3">💡</span> Security Best Practices
+                        </h3>
+                        <div class="space-y-4 text-white">
+                            <div class="flex items-start space-x-3">
+                                <span class="text-yellow-300 text-xl mt-1">🔐</span>
+                                <div>
+                                    <p class="font-semibold">Use Strong Passwords</p>
+                                    <p class="text-blue-100 text-sm">12+ characters with numbers, symbols</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3">
+                                <span class="text-yellow-300 text-xl mt-1">📱</span>
+                                <div>
+                                    <p class="font-semibold">Enable 2FA Protection</p>
+                                    <p class="text-blue-100 text-sm">Google Authenticator or similar app</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3">
+                                <span class="text-yellow-300 text-xl mt-1">👀</span>
+                                <div>
+                                    <p class="font-semibold">Monitor Account Activity</p>
+                                    <p class="text-blue-100 text-sm">Check for unauthorized access</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3">
+                                <span class="text-yellow-300 text-xl mt-1">🚪</span>
+                                <div>
+                                    <p class="font-semibold">Secure Logout</p>
+                                    <p class="text-blue-100 text-sm">Always logout from public devices</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Dashboard Navigation -->
         <div class="bg-white rounded-lg shadow-md p-6">

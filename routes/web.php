@@ -16,6 +16,11 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    // Two-Factor Authentication routes
+    Route::get('/2fa/setup', [App\Http\Controllers\Auth\TwoFactorController::class, 'show'])->name('2fa.setup');
+    Route::post('/2fa/enable', [App\Http\Controllers\Auth\TwoFactorController::class, 'enable'])->name('2fa.enable');
+    Route::post('/2fa/disable', [App\Http\Controllers\Auth\TwoFactorController::class, 'disable'])->name('2fa.disable');
+
     // Search routes
     Route::get('/search', [App\Http\Controllers\SearchController::class, 'index'])->name('search');
 
