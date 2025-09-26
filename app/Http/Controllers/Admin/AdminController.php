@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Services\EmailNotificationService;
 
 class AdminController extends Controller
 {
@@ -57,6 +58,10 @@ class AdminController extends Controller
     {
         // Approve an auction
         $auction->update(['status' => 'active']);
+
+        // Send approval email to seller
+        $emailService = new EmailNotificationService();
+        $emailService->sendAuctionApprovedNotification($auction, $auction->user);
 
         return redirect()->back()->with('success', "Auction '{$auction->title}' has been approved!");
     }

@@ -7,6 +7,7 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class AuctionController extends Controller
 {
@@ -219,5 +220,22 @@ class AuctionController extends Controller
         } else {
             return 0;      // No deposit
         }
+    }
+
+    public function getCurrentBid(Auction $auction)
+    {
+        $currentBid = $auction->bids()->with('user')->where('is_highest_snapshot', true)->first();
+        $currentAmount = $currentBid ? $currentBid->bid_amount : $auction->base_price;
+        $minIncrement = max(ceil($currentAmount * 0.01), 10000);
+        $minNextBid = $currentAmount + $minIncrement;
+
+        return response()->json([
+            'current_bid' => $currentAmount / 100,
+            'next_minimum' => $minNextBid / 100,
+            'current_winner' => $currentBid ? $currentBid->user->name : null,
+            'bid_count' => $auction->bids->count(),
+            'participants' => DB::table('auction_participants')->where('auction_id', $auction->id)->count(),
+            'timestamp' => now()->timestamp
+        ]);
     }
 }

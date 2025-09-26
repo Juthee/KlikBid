@@ -7,6 +7,7 @@ use App\Models\Bid;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Services\EmailNotificationService;
 
 class BiddingController extends Controller
 {
@@ -101,9 +102,13 @@ class BiddingController extends Controller
 
     public function placeBid(Request $request, Auction $auction)
     {
+        \Log::info('PlaceBid method called for auction: ' . $auction->id . ' by user: ' . Auth::id());
+
         $request->validate([
             'bid_amount' => 'required|numeric|min:1'
         ]);
+
+        \Log::info('Validation passed');
 
         $user = Auth::user();
         $bidAmountInCents = $request->bid_amount * 100;
@@ -115,21 +120,28 @@ class BiddingController extends Controller
             ->where('status', 'held')
             ->exists();
 
+        \Log::info('Has joined check: ' . ($hasJoined ? 'true' : 'false'));
+
         if (!$hasJoined) {
+            \Log::info('User has not joined auction, redirecting to join page');
             return redirect()->route('bidding.join', $auction)
                 ->with('error', 'You must join the auction first by paying the participation deposit.');
         }
 
         // Check auction status and timing
         if ($auction->status !== 'active') {
+            \Log::info('Auction not active, status: ' . $auction->status);
             return redirect()->back()
                 ->with('error', 'This auction is not currently active for bidding.');
         }
 
         if (now() < $auction->start_at || now() > $auction->end_at) {
+            \Log::info('Auction timing issue - now: ' . now() . ', start: ' . $auction->start_at . ', end: ' . $auction->end_at);
             return redirect()->back()
                 ->with('error', 'Bidding is not allowed at this time.');
         }
+
+        \Log::info('All checks passed, proceeding with bid validation');
 
         // Get current highest bid
         $currentHighestBid = $this->getCurrentHighestBid($auction);
@@ -139,8 +151,11 @@ class BiddingController extends Controller
         $minIncrement = max(ceil($currentBidAmount * 0.01), 100); // At least Rs 1
         $minNextBid = $currentBidAmount + $minIncrement;
 
+        \Log::info('Bid validation - current: ' . $currentBidAmount . ', min next: ' . $minNextBid . ', user bid: ' . $bidAmountInCents);
+
         // Validate bid amount
         if ($bidAmountInCents < $minNextBid) {
+            \Log::info('Bid amount too low');
             return redirect()->back()
                 ->with('error', 'Your bid must be at least Rs ' . number_format($minNextBid / 100, 0) .
                       ' (minimum ' . number_format($minIncrement / 100, 0) . ' increase)');
@@ -148,17 +163,25 @@ class BiddingController extends Controller
 
         // Check if user is trying to outbid themselves
         if ($currentHighestBid && $currentHighestBid->user_id === $user->id) {
+            \Log::info('User trying to outbid themselves');
             return redirect()->back()
                 ->with('error', 'You already have the highest bid on this auction.');
         }
 
+        \Log::info('About to enter try block for bid creation');
+
         try {
             DB::beginTransaction();
+            \Log::info('Transaction started');
 
             // Mark previous highest bid as no longer highest
             if ($currentHighestBid) {
+                \Log::info('Updating previous highest bid');
                 $currentHighestBid->update(['is_highest_snapshot' => false]);
+                \Log::info('Previous highest bid updated');
             }
+
+            \Log::info('About to create bid');
 
             // Create new bid
             $bid = Bid::create([
@@ -168,15 +191,21 @@ class BiddingController extends Controller
                 'is_highest_snapshot' => true,
             ]);
 
+            \Log::info('Bid created successfully with ID: ' . $bid->id);
+
             DB::commit();
+            \Log::info('Transaction committed successfully');
 
             return redirect()->route('auctions.show', $auction)
                 ->with('success', 'Bid placed successfully! Your bid: Rs ' . number_format($bidAmountInCents / 100, 0));
 
         } catch (\Exception $e) {
             DB::rollback();
+            \Log::error('Bid creation failed: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+
             return redirect()->back()
-                ->with('error', 'Failed to place bid. Please try again.');
+                ->with('error', 'Failed to place bid: ' . $e->getMessage());
         }
     }
 

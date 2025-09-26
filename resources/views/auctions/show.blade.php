@@ -1,8 +1,9 @@
 @php
-use Illuminate\Support\Facades\DB;
+    use Illuminate\Support\Facades\DB;
 @endphp
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,11 +13,129 @@ use Illuminate\Support\Facades\DB;
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
+
         .auction-image {
             min-height: 400px;
         }
     </style>
+    <script>
+        // Real-time bid updates
+        let currentHighestBid = {{ $auction->bids->max('amount') ?? $auction->base_price }};
+        let isPolling = true;
+
+        function updateBidStatus() {
+        if (!isPolling) return;
+
+            fetch(`/auctions/{{ $auction->id }}/current-bid`)
+                .then(response => response.json())
+                .then(data => {
+                    // Update current highest bid
+                    if (data.current_bid !== currentHighestBid) {
+                        currentHighestBid = data.current_bid;
+
+                        // Update the current bid amount
+                        const currentBidElement = document.querySelector('.text-3xl.font-bold.text-green-600');
+                        if (currentBidElement) {
+                            currentBidElement.textContent = 'Rs ' + data.current_bid.toLocaleString();
+                        }
+
+                        // Update next minimum bid
+                        const nextBidElement = document.querySelector('.text-lg.font-bold.text-blue-800');
+                        if (nextBidElement) {
+                            nextBidElement.textContent = 'Rs ' + data.next_minimum.toLocaleString();
+                        }
+
+                        // Update winner status - this is the key fix
+                            const winnerSection = document.querySelector('.bg-green-50.border.border-green-200, .bg-yellow-50.border.border-yellow-200');
+                            if (winnerSection && data.current_winner) {
+                                // Check if current user is the winner
+                                @auth
+                                const currentUserName = "{{ Auth::user()->name }}";
+                                if (data.current_winner === currentUserName) {
+                                    winnerSection.innerHTML = `
+                                        <div class="flex items-center">
+                                            <span class="text-2xl mr-3">🏆</span>
+                                            <div>
+                                                <p class="font-medium text-green-800">You're Winning!</p>
+                                                <p class="text-sm text-green-700">You have the highest bid</p>
+                                            </div>
+                                        </div>
+                                    `;
+                                    winnerSection.className = 'p-4 bg-green-50 border border-green-200 rounded mb-4';
+                                } else {
+                                    winnerSection.innerHTML = `
+                                        <div class="flex items-center">
+                                            <span class="text-2xl mr-3">👤</span>
+                                            <div>
+                                                <p class="font-medium text-yellow-800">Current Winner</p>
+                                                <p class="text-sm text-yellow-700">${data.current_winner} is leading</p>
+                                            </div>
+                                        </div>
+                                    `;
+                                    winnerSection.className = 'p-4 bg-yellow-50 border border-yellow-200 rounded mb-4';
+                                }
+                                @endauth
+                            }
+
+                        // Update input field
+                        const bidInput = document.querySelector('#bid_amount');
+                        if (bidInput) {
+                            bidInput.setAttribute('min', data.next_minimum);
+                            bidInput.value = data.next_minimum;
+                        }
+
+                        // Visual notification of new bid
+                        showNewBidNotification(data.current_bid, data.current_winner);
+                    }
+                })
+                .catch(error => console.log('Bid update failed:', error));
+        }
+
+        function showNewBidNotification(amount, winner) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = 'bid-notification';
+            notification.style.cssText = `
+                position: fixed; top: 20px; right: 20px;
+                background: #28a745; color: white; padding: 15px;
+                border-radius: 5px; z-index: 1000;
+                animation: slideIn 0.3s ease-out;
+            `;
+            notification.innerHTML = `
+                <strong>New Bid!</strong><br>
+                Rs ${amount.toLocaleString()} by ${winner}
+            `;
+
+            document.body.appendChild(notification);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Start polling every 3 seconds
+        setInterval(updateBidStatus, 3000);
+
+        // Stop polling when user leaves page
+        window.addEventListener('beforeunload', () => {
+            isPolling = false;
+        });
+    </script>
+
+    <style>
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+            }
+
+            to {
+                transform: translateX(0);
+            }
+        }
+    </style>
 </head>
+
 <body class="bg-gray-50">
     <!-- Header -->
     <header class="bg-white shadow-lg">
@@ -36,13 +155,16 @@ use Illuminate\Support\Facades\DB;
                     <a href="#" class="text-gray-700 hover:text-blue-600">Browse</a>
                     <a href="#" class="text-gray-700 hover:text-blue-600">Help</a>
                     @guest
-                        <a href="{{ route('login') }}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Login</a>
-                        <a href="{{ route('register') }}" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Register</a>
+                        <a href="{{ route('login') }}"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Login</a>
+                        <a href="{{ route('register') }}"
+                            class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Register</a>
                     @else
                         <a href="{{ route('dashboard') }}" class="text-gray-700 hover:text-blue-600">Dashboard</a>
                         <form method="POST" action="{{ route('logout') }}" class="inline">
                             @csrf
-                            <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Logout</button>
+                            <button type="submit"
+                                class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Logout</button>
                         </form>
                     @endguest
                 </nav>
@@ -51,13 +173,14 @@ use Illuminate\Support\Facades\DB;
     </header>
 
     <!-- Success Message -->
-    @if(session('success'))
+    @if (session('success'))
         <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 mx-4 mt-4 rounded">
             <div class="flex items-center">
                 <span class="text-2xl mr-3">✅</span>
                 <div>
                     <p class="font-medium">{{ session('success') }}</p>
-                    <p class="text-sm">You will receive an email notification once your auction is reviewed and approved.</p>
+                    <p class="text-sm">You will receive an email notification once your auction is reviewed and
+                        approved.</p>
                 </div>
             </div>
         </div>
@@ -70,32 +193,35 @@ use Illuminate\Support\Facades\DB;
             <div class="lg:col-span-2">
                 <!-- Auction Images -->
                 <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-                    @if($auction->images && count($auction->images) > 0)
+                    @if ($auction->images && count($auction->images) > 0)
                         <div class="relative">
                             <!-- Main Image -->
-                            <img src="{{ asset('storage/' . $auction->images[0]) }}"
-                                alt="{{ $auction->title }}"
-                                class="w-full h-96 object-contain bg-gray-100">
+                            <img id="mainImage" src="{{ asset('storage/' . $auction->images[0]) }}" alt="{{ $auction->title }}"
+                                class="w-full h-96 object-contain bg-gray-100 cursor-zoom-in">
 
                             <!-- Image Counter Badge -->
-                            @if(count($auction->images) > 1)
-                                <div class="absolute bottom-4 right-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded-lg text-sm font-medium">
+                            @if (count($auction->images) > 1)
+                                <div
+                                    class="absolute bottom-4 right-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded-lg text-sm font-medium">
                                     📸 {{ count($auction->images) }} photos
                                 </div>
                             @endif
 
                             <!-- Image Gallery Thumbnails (if multiple images) -->
-                            @if(count($auction->images) > 1)
+                            @if (count($auction->images) > 1)
                                 <div class="absolute bottom-4 left-4 flex space-x-2">
-                                    @foreach(array_slice($auction->images, 1, 4) as $index => $image)
-                                        <div class="w-12 h-12 rounded border-2 border-white overflow-hidden">
-                                            <img src="{{ asset('storage/' . $auction->images[0]) }}"
-                                                alt="{{ $auction->title }}"
-                                                class="w-full h-96 object-contain bg-gray-100">
-                                        </div>
-                                        @if($index == 3 && count($auction->images) > 5)
-                                            <div class="w-12 h-12 rounded border-2 border-white bg-black bg-opacity-70 flex items-center justify-center">
-                                                <span class="text-white text-xs font-bold">+{{ count($auction->images) - 5 }}</span>
+                                    @foreach (array_slice($auction->images, 1, 4) as $index => $image)
+                                    <div class="w-12 h-12 rounded border-2 border-white overflow-hidden cursor-pointer hover:opacity-75"
+                                        onclick="changeMainImage('{{ asset('storage/' . $image) }}')">
+                                        <img src="{{ asset('storage/' . $image) }}"
+                                            alt="Photo {{ $index + 2 }}"
+                                            class="w-full h-full object-cover">
+                                    </div>
+                                        @if ($index == 3 && count($auction->images) > 5)
+                                            <div
+                                                class="w-12 h-12 rounded border-2 border-white bg-black bg-opacity-70 flex items-center justify-center">
+                                                <span
+                                                    class="text-white text-xs font-bold">+{{ count($auction->images) - 5 }}</span>
                                             </div>
                                             @break
                                         @endif
@@ -120,21 +246,21 @@ use Illuminate\Support\Facades\DB;
                     <div class="flex items-center space-x-3">
                         <!-- Edit Button (only for pending auctions by owner) -->
                         @auth
-                            @if($auction->user_id === Auth::id() && $auction->status === 'pending_approval')
+                            @if ($auction->user_id === Auth::id() && $auction->status === 'pending_approval')
                                 <a href="{{ route('auctions.edit', $auction) }}"
-                                class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm font-medium">
+                                    class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm font-medium">
                                     ✏️ Edit Auction
                                 </a>
                             @endif
                         @endauth
 
                         <!-- Status Badge -->
-                        <span class="px-3 py-1 rounded-full text-sm font-medium
-                            @if($auction->status == 'pending_approval') bg-yellow-100 text-yellow-800
+                        <span
+                            class="px-3 py-1 rounded-full text-sm font-medium
+                            @if ($auction->status == 'pending_approval') bg-yellow-100 text-yellow-800
                             @elseif($auction->status == 'active') bg-green-100 text-green-800
                             @elseif($auction->status == 'ended') bg-gray-100 text-gray-800
-                            @else bg-blue-100 text-blue-800
-                            @endif">
+                            @else bg-blue-100 text-blue-800 @endif">
                             {{ ucfirst(str_replace('_', ' ', $auction->status)) }}
                         </span>
                     </div>
@@ -178,24 +304,27 @@ use Illuminate\Support\Facades\DB;
                     <!-- Current High Bid -->
                     <div class="mb-4">
                         <p class="text-sm text-gray-600">
-                            @if($currentBid)
+                            @if ($currentBid)
                                 Current Highest Bid
                             @else
                                 Starting Price
                             @endif
                         </p>
-                        <p class="text-3xl font-bold text-green-600">Rs {{ number_format($currentAmount / 100, 0) }}</p>
-                        @if($currentBid)
-                            <p class="text-xs text-gray-500">by {{ $currentBid->user->name }} • {{ $currentBid->created_at->diffForHumans() }}</p>
+                        <p class="text-3xl font-bold text-green-600">Rs {{ number_format($currentAmount / 100, 0) }}
+                        </p>
+                        @if ($currentBid)
+                            <p class="text-xs text-gray-500">by {{ $currentBid->user->name }} •
+                                {{ $currentBid->created_at->diffForHumans() }}</p>
                         @endif
                     </div>
 
                     <!-- Next Minimum Bid -->
-                    @if($auction->status == 'active')
+                    @if ($auction->status == 'active')
                         <div class="mb-4 p-3 bg-blue-50 rounded">
                             <p class="text-sm text-blue-600 font-medium">Next Minimum Bid</p>
                             <p class="text-lg font-bold text-blue-800">Rs {{ number_format($minNextBid / 100, 0) }}</p>
-                            <p class="text-xs text-blue-600">Minimum increase: Rs {{ number_format($minIncrement / 100, 0) }}</p>
+                            <p class="text-xs text-blue-600">Minimum increase: Rs
+                                {{ number_format($minIncrement / 100, 0) }}</p>
                         </div>
                     @endif
 
@@ -203,7 +332,7 @@ use Illuminate\Support\Facades\DB;
                     <div class="mb-6 p-4 bg-gray-50 rounded">
                         <p class="text-sm font-medium text-gray-700 mb-2">Participation Deposit</p>
                         <p class="text-lg font-bold text-purple-600">
-                            @if($auction->deposit_amount > 0)
+                            @if ($auction->deposit_amount > 0)
                                 Rs {{ number_format($auction->deposit_amount / 100, 0) }}
                             @else
                                 No deposit required
@@ -223,7 +352,7 @@ use Illuminate\Support\Facades\DB;
                             $userIsHighestBidder = $currentBid && $currentBid->user_id === Auth::id();
                         @endphp
 
-                        @if($auction->status == 'pending_approval')
+                        @if ($auction->status == 'pending_approval')
                             <div class="p-4 bg-yellow-50 border border-yellow-200 rounded">
                                 <div class="flex items-center">
                                     <span class="text-2xl mr-3">⏳</span>
@@ -244,17 +373,20 @@ use Illuminate\Support\Facades\DB;
                                 </div>
                             </div>
                         @elseif($auction->status == 'active')
-                            @if(!$userJoined)
+                            @if (!$userJoined)
                                 <!-- Join Auction Button -->
-                                <a href="{{ route('bidding.join', $auction) }}"
-                                class="block w-full bg-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-purple-700 text-center mb-3">
-                                    💳 Join Auction (Pay Deposit)
-                                </a>
+                                <form method="POST" action="{{ route('webxpay.deposit', $auction) }}">
+                                    @csrf
+                                    <button type="submit"
+                                        class="block w-full bg-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-purple-700">
+                                        💳 Join Auction (Pay Deposit)
+                                    </button>
+                                </form>
                                 <p class="text-xs text-gray-600 text-center mb-4">
                                     You must join the auction first to place bids
                                 </p>
                             @else
-                                @if($userIsHighestBidder)
+                                @if ($userIsHighestBidder)
                                     <div class="p-4 bg-green-50 border border-green-200 rounded mb-4">
                                         <div class="flex items-center">
                                             <span class="text-2xl mr-3">🏆</span>
@@ -275,11 +407,8 @@ use Illuminate\Support\Facades\DB;
                                         </label>
                                         <div class="relative">
                                             <span class="absolute left-3 top-3 text-gray-500">Rs</span>
-                                            <input type="number"
-                                                id="bid_amount"
-                                                name="bid_amount"
-                                                min="{{ $minNextBid / 100 }}"
-                                                step="1"
+                                            <input type="number" id="bid_amount" name="bid_amount"
+                                                min="{{ $minNextBid / 100 }}" step="1"
                                                 value="{{ $minNextBid / 100 }}"
                                                 class="w-full pl-8 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                 placeholder="{{ number_format($minNextBid / 100, 0) }}">
@@ -292,31 +421,32 @@ use Illuminate\Support\Facades\DB;
                                     <!-- Quick Bid Buttons -->
                                     <div class="grid grid-cols-3 gap-2 mb-4">
                                         <button type="button"
-                                                onclick="setBidAmount({{ ($minNextBid + ($minIncrement * 1)) / 100 }})"
-                                                class="bg-gray-100 text-gray-700 py-2 px-3 rounded text-sm hover:bg-gray-200">
+                                            onclick="setBidAmount({{ ($minNextBid + $minIncrement * 1) / 100 }})"
+                                            class="bg-gray-100 text-gray-700 py-2 px-3 rounded text-sm hover:bg-gray-200">
                                             +Rs {{ number_format($minIncrement / 100, 0) }}
                                         </button>
                                         <button type="button"
-                                                onclick="setBidAmount({{ ($minNextBid + ($minIncrement * 5)) / 100 }})"
-                                                class="bg-gray-100 text-gray-700 py-2 px-3 rounded text-sm hover:bg-gray-200">
+                                            onclick="setBidAmount({{ ($minNextBid + $minIncrement * 5) / 100 }})"
+                                            class="bg-gray-100 text-gray-700 py-2 px-3 rounded text-sm hover:bg-gray-200">
                                             +Rs {{ number_format(($minIncrement * 5) / 100, 0) }}
                                         </button>
                                         <button type="button"
-                                                onclick="setBidAmount({{ ($minNextBid + ($minIncrement * 10)) / 100 }})"
-                                                class="bg-gray-100 text-gray-700 py-2 px-3 rounded text-sm hover:bg-gray-200">
+                                            onclick="setBidAmount({{ ($minNextBid + $minIncrement * 10) / 100 }})"
+                                            class="bg-gray-100 text-gray-700 py-2 px-3 rounded text-sm hover:bg-gray-200">
                                             +Rs {{ number_format(($minIncrement * 10) / 100, 0) }}
                                         </button>
                                     </div>
 
                                     <button type="submit"
-                                            class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition duration-200">
+                                        class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition duration-200">
                                         🎯 Place Bid
                                     </button>
                                 </form>
                             @endif
 
-                            @if($auction->buy_now_price)
-                                <button class="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 mb-3">
+                            @if ($auction->buy_now_price)
+                                <button
+                                    class="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 mb-3">
                                     ⚡ Buy Now - Rs {{ number_format($auction->buy_now_price / 100, 0) }}
                                 </button>
                             @endif
@@ -335,7 +465,7 @@ use Illuminate\Support\Facades\DB;
                         <div class="p-4 bg-blue-50 border border-blue-200 rounded text-center">
                             <p class="text-blue-800 font-medium mb-2">Want to bid on this auction?</p>
                             <a href="{{ route('login') }}"
-                            class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                                class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
                                 Login to Bid
                             </a>
                         </div>
@@ -352,12 +482,13 @@ use Illuminate\Support\Facades\DB;
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-600">Participants</span>
-                            <span class="font-medium">{{ DB::table('auction_participants')->where('auction_id', $auction->id)->count() }}</span>
+                            <span
+                                class="font-medium">{{ DB::table('auction_participants')->where('auction_id', $auction->id)->count() }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-600">Time Left</span>
                             <span class="font-medium text-red-600">
-                                @if($auction->status == 'active')
+                                @if ($auction->status == 'active')
                                     @php
                                         // Calculate time remaining properly
                                         $now = now();
@@ -388,10 +519,10 @@ use Illuminate\Support\Facades\DB;
                         </div>
                     </div>
 
-                    @if($auction->bids->count() > 0)
+                    @if ($auction->bids->count() > 0)
                         <div class="mt-4 pt-4 border-t border-gray-200">
                             <a href="{{ route('bidding.history', $auction) }}"
-                            class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                class="text-sm text-blue-600 hover:text-blue-800 font-medium">
                                 View Bid History →
                             </a>
                         </div>
@@ -399,11 +530,15 @@ use Illuminate\Support\Facades\DB;
                 </div>
             </div>
 
-<script>
-function setBidAmount(amount) {
-    document.getElementById('bid_amount').value = amount;
-}
-</script>
+            <script>
+                function setBidAmount(amount) {
+                    document.getElementById('bid_amount').value = amount;
+                }
+
+                function changeMainImage(imageSrc) {
+                    document.getElementById('mainImage').src = imageSrc;
+                }
+            </script>
         </div>
     </div>
 
@@ -414,4 +549,5 @@ function setBidAmount(amount) {
         </div>
     </footer>
 </body>
+
 </html>

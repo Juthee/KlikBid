@@ -6,13 +6,24 @@
     <title>Search Results - KlikBid</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .auction-card:hover { transform: translateY(-4px); transition: transform 0.3s ease; }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .auction-card:hover {
+            transform: translateY(-4px);
+            transition: transform 0.3s ease;
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
     <!-- Header with Search -->
-    <header class="bg-white shadow-lg sticky top-0 z-50">
+    <header class="bg-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center py-4">
                 <!-- Logo -->
@@ -71,18 +82,22 @@
                     <!-- Category Filter -->
                     <select name="category" class="bg-white border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
                         <option value="">All Categories</option>
-                        @foreach($categories as $category)
-                            <!-- Main Category -->
-                            <option value="{{ $category->slug }}" {{ request('category') == $category->slug ? 'selected' : '' }}>
-                                {{ $category->icon }} {{ $category->name }}
-                            </option>
-                            <!-- Subcategories -->
-                            @foreach($category->children()->orderBy('sort_order')->get() as $subcategory)
-                                <option value="{{ $subcategory->slug }}" {{ request('category') == $subcategory->slug ? 'selected' : '' }}>
-                                    &nbsp;&nbsp;&nbsp;&nbsp;└─ {{ $subcategory->icon }} {{ $subcategory->name }}
+                        @if(isset($categories))
+                            @foreach($categories as $category)
+                                <!-- Main Category -->
+                                <option value="{{ $category->slug ?? $category->id }}" {{ request('category') == ($category->slug ?? $category->id) ? 'selected' : '' }}>
+                                    {{ $category->icon ?? '📦' }} {{ $category->name }}
                                 </option>
+                                <!-- Subcategories -->
+                                @if($category->children)
+                                    @foreach($category->children()->orderBy('sort_order')->get() as $subcategory)
+                                        <option value="{{ $subcategory->slug ?? $subcategory->id }}" {{ request('category') == ($subcategory->slug ?? $subcategory->id) ? 'selected' : '' }}>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;└─ {{ $subcategory->icon ?? '📦' }} {{ $subcategory->name }}
+                                        </option>
+                                    @endforeach
+                                @endif
                             @endforeach
-                        @endforeach
+                        @endif
                     </select>
 
                     <!-- Location Filter -->
@@ -188,15 +203,15 @@
         <div class="flex justify-between items-center mb-6">
             <div>
                 <h2 class="text-2xl font-bold text-gray-900">
-                    @if($searchStats['query'])
+                    @if(isset($searchStats['query']) && $searchStats['query'])
                         Search Results for "{{ $searchStats['query'] }}"
                     @else
                         Browse Auctions
                     @endif
                 </h2>
                 <p class="text-gray-600 mt-1">
-                    Found {{ $searchStats['total'] }} auctions
-                    @if($searchStats['filters_applied'] > 0)
+                    Found {{ $searchStats['total'] ?? $auctions->total() ?? $auctions->count() }} auctions
+                    @if(isset($searchStats['filters_applied']) && $searchStats['filters_applied'] > 0)
                         with {{ $searchStats['filters_applied'] }} filter(s) applied
                     @endif
                 </p>
@@ -206,99 +221,134 @@
         <!-- Results -->
         @if($auctions->count() > 0)
             <!-- Auction Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 @foreach($auctions as $auction)
-                    <div class="bg-white rounded-xl shadow-md auction-card overflow-hidden border">
-                        <!-- Auction Image Placeholder -->
-                        <div class="h-48 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                            <span class="text-4xl">
-                                @if($auction->category->slug == 'land-properties')
-                                    🏠
-                                @elseif($auction->category->slug == 'vehicles')
-                                    🚗
-                                @elseif($auction->category->slug == 'electronics')
-                                    📱
-                                @elseif($auction->category->slug == 'luxury')
-                                    💎
+                    <div class="bg-white rounded-lg shadow-md auction-card overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full
+                        @if(request('sort') == 'ending_soon') border-2 border-red-200
+                        @else border-2 border-green-200
+                        @endif">
+
+                        <!-- Image Section -->
+                        <div class="h-48 bg-gray-200 flex items-center justify-center relative overflow-hidden">
+                            @if($auction->images && count($auction->images) > 0)
+                                <img src="{{ asset('storage/' . $auction->images[0]) }}"
+                                     alt="{{ $auction->title }}"
+                                     class="w-full h-full object-cover">
+                            @else
+                                <span class="text-gray-500">🏠 {{ $auction->category->name ?? 'Category' }}</span>
+                            @endif
+
+                            <!-- Status Indicator -->
+                            <div class="absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold
+                                @if(request('sort') == 'ending_soon') bg-red-500 text-white animate-bounce
+                                @else bg-green-500 text-white animate-pulse
+                                @endif">
+                                @if(request('sort') == 'ending_soon')
+                                    URGENT
                                 @else
-                                    📦
+                                    LIVE
                                 @endif
-                            </span>
+                            </div>
                         </div>
 
-                        <div class="p-4">
-                            <!-- Category and Status -->
-                            <div class="flex items-start justify-between mb-2">
-                                <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                                    {{ $auction->category->name }}
-                                </span>
-                                <span class="text-green-600 text-xs font-medium">🟢 ACTIVE</span>
-                            </div>
+                        <!-- Content Section -->
+                        <div class="p-4 flex flex-col flex-grow">
+                            <h4 class="font-semibold mb-2">{{ $auction->title }}</h4>
+                            <p class="text-sm text-gray-600 mb-3 line-clamp-2">{{ Str::limit($auction->description, 50) }}</p>
 
-                            <!-- Title -->
-                            <h3 class="font-semibold text-lg mb-2 text-gray-800">{{ $auction->title }}</h3>
-
-                            <!-- Description -->
-                            <p class="text-sm text-gray-600 mb-3">{{ Str::limit($auction->description, 50) }}</p>
-
-                            <!-- Price and Location -->
-                            <div class="flex justify-between items-center mb-3">
-                                <div>
-                                    <p class="text-xs text-gray-500">Starting Bid</p>
-                                    <p class="font-bold text-lg text-green-600">Rs {{ number_format($auction->base_price / 100, 0) }}</p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-xs text-gray-500">📍 Location</p>
-                                    <p class="text-sm font-medium">{{ $auction->district ?? 'N/A' }}</p>
-                                </div>
-                            </div>
-
-                            <!-- Time and Action -->
-                            <div class="flex justify-between items-center mb-4">
-                                <div>
-                                    <p class="text-xs text-gray-500">Ends in</p>
-                                    <p class="font-semibold text-red-600">
-                                        @php
-                                            $hoursLeft = \Carbon\Carbon::now()->diffInHours($auction->end_at);
-                                            $daysLeft = intval($hoursLeft / 24);
-                                            $remainingHours = $hoursLeft % 24;
-                                        @endphp
-                                        @if($daysLeft > 0)
-                                            {{ $daysLeft }}d {{ $remainingHours }}h
+                            <!-- Additional auction details -->
+                            <div class="space-y-1 mb-3 text-xs">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-500">Deposit:</span>
+                                    <span class="font-medium text-purple-600">
+                                        @if($auction->deposit_amount > 0)
+                                            Rs {{ number_format($auction->deposit_amount / 100, 0) }}
                                         @else
-                                            {{ $hoursLeft }}h
+                                            Free
                                         @endif
+                                    </span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-500">Total Bids:</span>
+                                    <span class="font-medium">{{ $auction->bids->count() ?? 0 }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Pricing and Time Info -->
+                            <div class="flex justify-between items-end mb-4 mt-auto">
+                                <div>
+                                    <p class="text-xs text-gray-500">Current Bid</p>
+                                    <p class="font-bold text-lg
+                                        @if(request('sort') == 'ending_soon') text-red-600
+                                        @else text-green-600
+                                        @endif">
+                                        Rs {{ number_format($auction->base_price / 100, 0) }}
                                     </p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-xs text-gray-500">👤 Seller</p>
-                                    <p class="text-sm font-medium">{{ $auction->user->name }}</p>
+                                    <p class="text-xs text-gray-500">Ends in</p>
+                                    <p class="font-semibold text-red-600">
+                                        @php
+                                            $now = now();
+                                            $endTime = $auction->end_at;
+
+                                            if ($now >= $endTime) {
+                                                $timeDisplay = 'Ended';
+                                            } else {
+                                                $totalMinutes = $now->diffInMinutes($endTime);
+                                                $days = intval($totalMinutes / (24 * 60));
+                                                $hours = intval(($totalMinutes % (24 * 60)) / 60);
+                                                $minutes = $totalMinutes % 60;
+
+                                                if ($days > 0) {
+                                                    $timeDisplay = $days . 'd ' . $hours . 'h';
+                                                } elseif ($hours > 0) {
+                                                    $timeDisplay = $hours . 'h ' . $minutes . 'm';
+                                                } else {
+                                                    $timeDisplay = $minutes . 'm';
+                                                }
+                                            }
+                                        @endphp
+                                        {{ $timeDisplay }}
+                                    </p>
                                 </div>
                             </div>
 
-                            <!-- Bid Button -->
-                            <button class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-semibold transition-colors">
-                                Place Bid
-                            </button>
+                            <!-- Action Button -->
+                            <div class="mt-auto">
+                                <a href="{{ route('auctions.show', $auction) }}"
+                                   class="block w-full text-white text-center py-2 rounded-lg font-semibold transition-colors
+                                    @if(request('sort') == 'ending_soon') bg-red-600 hover:bg-red-700
+                                    @else bg-green-600 hover:bg-green-700
+                                    @endif">
+                                    @if(request('sort') == 'ending_soon')
+                                        ⚡ BID URGENTLY
+                                    @else
+                                        🎯 BID NOW
+                                    @endif
+                                </a>
+                            </div>
                         </div>
                     </div>
                 @endforeach
             </div>
 
             <!-- Pagination -->
-            <div class="mt-12">
-                {{ $auctions->links() }}
-            </div>
+            @if(method_exists($auctions, 'links'))
+                <div class="mt-12">
+                    {{ $auctions->links() }}
+                </div>
+            @endif
         @else
             <!-- No Results -->
             <div class="text-center py-16">
                 <div class="text-6xl mb-4">🔍</div>
                 <h3 class="text-2xl font-bold text-gray-900 mb-2">No auctions found</h3>
                 <p class="text-gray-600 mb-6">
-                    @if($searchStats['query'])
+                    @if(isset($searchStats['query']) && $searchStats['query'])
                         No results found for "{{ $searchStats['query'] }}". Try adjusting your search or filters.
                     @else
-                        No auctions match your current filter criteria.
+                        No auctions match your current filter criteria. Try adjusting your search or filters.
                     @endif
                 </p>
                 <a href="{{ url('/') }}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
@@ -328,9 +378,11 @@
                 <div>
                     <h6 class="font-semibold mb-4">Categories</h6>
                     <ul class="space-y-2 text-gray-400">
-                        @foreach($categories->take(4) as $category)
-                            <li><a href="{{ route('search', ['category' => $category->slug]) }}" class="hover:text-white">{{ $category->name }}</a></li>
-                        @endforeach
+                        @if(isset($categories))
+                            @foreach($categories->take(4) as $category)
+                                <li><a href="{{ route('search', ['category' => $category->slug ?? $category->id]) }}" class="hover:text-white">{{ $category->name }}</a></li>
+                            @endforeach
+                        @endif
                     </ul>
                 </div>
                 <div>
